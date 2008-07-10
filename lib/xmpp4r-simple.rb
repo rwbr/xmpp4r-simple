@@ -231,6 +231,43 @@ module Jabber
       !queue(:received_messages).empty?
     end
 
+    # Returns an array of iq stanzas received since the last time
+    # iq_stanzas was called. There will be no stanzas in this queue
+    # unless you have enabled capture of <iq/> stanzas using the
+    # capture_iq_stanzas! method. Passing a block will yield each stanza in
+    # turn, allowing you to break part-way through processing (especially
+    # useful when your message handling code is not thread-safe (e.g.,
+    # ActiveRecord).
+    #
+    # e.g.:
+    #
+    #   jabber.capture_iq_stanzas!
+    #   jabber.iq_stanzas do |iq|
+    #     puts "Received iq stanza from #{iq.from}"
+    #   end
+    def iq_stanza(&block)
+      dequeue(:iq_stanzas, &block)
+    end
+
+    # Returns true if there are unprocessed iq stanzas waiting in the
+    # queue, false otherwise.
+    def iq_stanzas?
+      !queue(:iq_stanzas).empty?
+    end
+    
+    # Tell the client to capture (or stop capturing) <iq/> stanzas
+    # addressed to it.  When the client is initially started, this
+    # is false.
+    def capture_iq_stanzas!(capture=true)
+      @iq_mutex.synchronize { @capture_iq_stanzas = capture }
+    end
+    
+    # Returns true if iq stanzas will be captured in the queue, as
+    # they arrive, false otherwise.
+    def capture_iq_stanzas?
+      @capture_iq_stanzas
+    end
+
     # Returns an array of presence updates received since the last time
     # presence_updates was called. Passing a block will yield each update in
     # turn, allowing you to break part-way through processing (especially
@@ -431,6 +468,12 @@ module Jabber
         else
           queue(:subscription_requests) << [roster_item, presence]
         end
+      end
+
+      @iq_mutex = Mutex.new
+      capture_iq_stanzas!(false)
+      client.add_iq_callback do |iq|
+        queue(:iq_messages) << iq if capture_iq_stanzas?
       end
 
       @presence_updates = {}
