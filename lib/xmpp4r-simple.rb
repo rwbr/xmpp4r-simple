@@ -114,8 +114,9 @@ module Jabber
     def deliver(jid, message, type=:chat)
       contacts(jid) do |friend|
         unless subscribed_to? friend
-          add(friend.jid)
-          return deliver_deferred(friend.jid, message, type)
+          return
+#          add(friend.jid)
+#          return deliver_deferred(friend.jid, message, type)
         end
         if message.kind_of?(Jabber::Message)
           msg = message
