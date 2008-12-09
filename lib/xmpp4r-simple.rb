@@ -96,9 +96,11 @@ module Jabber
     # passed in as the status_message argument.
     #
     # jabber = Jabber::Simple.new("me@example.com", "password", "Chat with me - Please!")
-    def initialize(jid, password, status = nil, status_message = "Available")
+    def initialize(jid, password, status = nil, status_message = "Available", host = nil, port=5222)
       @jid = jid
       @password = password
+      @host = host
+      @port = port
       @disconnected = false
       status(status, status_message)
       start_deferred_delivery_thread
@@ -480,7 +482,7 @@ module Jabber
       # Connect
       jid = JID.new(@jid)
       my_client = Client.new(@jid)
-      my_client.connect
+      my_client.connect(@host, @port)
       my_client.auth(@password)
       self.client = my_client
 
