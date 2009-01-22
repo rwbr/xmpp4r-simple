@@ -19,12 +19,25 @@ require 'rubygems'
 require 'xmpp4r'
 require 'xmpp4r/roster'
 require 'xmpp4r/vcard'
+require 'xmpp4r/pubsub'
+require 'xmpp4r/pubsub/helper/servicehelper'
+require 'xmpp4r/pubsub/helper/nodebrowser'
+require 'xmpp4r/pubsub/helper/nodehelper'
 
 module Jabber
 
   class ConnectionError < StandardError #:nodoc:
   end
-  
+
+  class NotConnected < StandardError #:nodoc:
+  end
+
+  class NoPubSubService < StandardError #:nodoc:
+  end
+
+  class AlreadySet < StandardError #:nodoc:
+  end
+
   class Contact #:nodoc:
 
     include DRb::DRbUndumped if defined?(DRb::DRbUndumped)
@@ -87,6 +100,7 @@ module Jabber
       @jid = jid
       @password = password
       @disconnected = false
+      @pubsub = nil
       status(status, status_message)
       start_deferred_delivery_thread
     end
@@ -486,6 +500,64 @@ module Jabber
       end
       queue_items
     end
+
+    # Sets the PubSub service. Just one service is allowed.
+    def set_pubsub_service(service)
+      raise NotConnected, "You are not connected" if @disconnected
+      raise AlreadySet, "You already have a PubSub service. Currently it's not allowed to have more." if ! @pubsub.nil?
+      @pubsub = PubSub::ServiceHelper.new(@client, service)
+
+      @pubsub.add_event_callback do |event|
+	  queue(:received_events) << event
+      end
+    end
+
+    # Subscribe to a node.
+    def pubsubscribe_to(node)
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      @pubsub.subscribe_to(node)
+    end
+
+    # Return the subscriptions we have in the configured PubSub service.
+    def pubsubscriptions
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      @pubsub.get_subscriptions_from_all_nodes()
+    end
+
+    # Just like #received_messages, but for PubSub events
+    def received_events(&block)
+      dequeue(:received_events, &block)
+    end
+
+    # Returns true if there are unprocessed received events waiting in the
+    # queue, false otherwise.
+    def received_events?
+      !queue(:received_events).empty?
+    end
+
+    # Create a PubSub node (Lots of options still have to be encoded!)
+    def create_node(node)
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      @pubsub.create_node(node)
+    end
+
+    # Publish an Item. This infers an item of Jabber::PubSub::Item kind is passed
+    def publish_item(node, item)
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      @pubsub.publish_item_to(node, item)
+    end
+
+    # Publish Simple Item. This is an item with one element and some text to it.
+    def publish_simple_item(node, element, text)
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+
+      item = Jabber::PubSub::Item.new
+      xml = REXML::Element.new(element)
+      xml.text = text
+      item.add(xml)
+      publish_item(node, item)
+    end
+
   end
 end
 
