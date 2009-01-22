@@ -501,10 +501,15 @@ module Jabber
       queue_items
     end
 
+    # Checks if the PubSub service is set
+    def has_pubsub?
+      ! @pubsub.nil?
+    end
+
     # Sets the PubSub service. Just one service is allowed.
     def set_pubsub_service(service)
       raise NotConnected, "You are not connected" if @disconnected
-      raise AlreadySet, "You already have a PubSub service. Currently it's not allowed to have more." if ! @pubsub.nil?
+      raise AlreadySet, "You already have a PubSub service. Currently it's not allowed to have more." if has_pubsub?
       @pubsub = PubSub::ServiceHelper.new(@client, service)
 
       @pubsub.add_event_callback do |event|
@@ -514,13 +519,13 @@ module Jabber
 
     # Subscribe to a node.
     def pubsubscribe_to(node)
-      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
       @pubsub.subscribe_to(node)
     end
 
     # Return the subscriptions we have in the configured PubSub service.
     def pubsubscriptions
-      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
       @pubsub.get_subscriptions_from_all_nodes()
     end
 
@@ -537,19 +542,19 @@ module Jabber
 
     # Create a PubSub node (Lots of options still have to be encoded!)
     def create_node(node)
-      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
       @pubsub.create_node(node)
     end
 
     # Publish an Item. This infers an item of Jabber::PubSub::Item kind is passed
     def publish_item(node, item)
-      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
       @pubsub.publish_item_to(node, item)
     end
 
     # Publish Simple Item. This is an item with one element and some text to it.
     def publish_simple_item(node, element, text)
-      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if @pubsub.nil?
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
 
       item = Jabber::PubSub::Item.new
       xml = REXML::Element.new(element)

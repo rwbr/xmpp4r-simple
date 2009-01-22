@@ -35,6 +35,10 @@ class JabberSimpleTest < Test::Unit::TestCase
       @jid2_raw = @@connections[:jid2_raw]
       @jid1 = @jid1_raw.strip.to_s
       @jid2 = @jid2_raw.strip.to_s
+      @domain1 = @jid1_raw.domain
+      @domain2 = @jid2_raw.domain
+      @pubsub1 = "pubsub." + @domain1
+      @pubsub2 = "pubsub." + @domain2
       return true
     end
 
@@ -218,6 +222,36 @@ class JabberSimpleTest < Test::Unit::TestCase
     end
 
     @client1.reconnect
+  end
+
+  def test_set_pubsub_service
+    assert ! @client1.has_pubsub?
+    @client1.set_pubsub_service(@pubsub1)
+    assert @client1.has_pubsub?
+  end
+
+  def test_create_node
+    @client1.set_pubsub_service(@pubsub1) if ! @client1.has_pubsub?
+    @client2.set_pubsub_service(@pubsub2) if ! @client2.has_pubsub?
+
+    assert_nothing_raised @client1.create_node("/home/#{@domain1}/testnode1")
+    assert_nothing_raised @client2.create_node("/home/#{@domain2}/testnode2")
+    assert_nothing_raised @client1.create_node("/home/#{@domain1}/testnode1/level1")
+    assert_nothing_raised @client2.create_node("/home/#{@domain2}/testnode2/level2")
+  end
+
+  def test_publish_and_subscribe
+    begin
+      test_create_node
+    rescue
+      # do nothing
+    end
+
+    @client1.pubsubscribe_to("/home/#{@domain2}/testnode2/level2")
+    @client2.pubsubscribe_to("/home/#{@domain1}/testnode1/level1")
+
+    puts @client1.pubsubscriptions
+    puts @client2.pubsubscriptions
   end
 
   private
