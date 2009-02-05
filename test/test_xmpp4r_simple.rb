@@ -95,7 +95,7 @@ class JabberSimpleTest < Test::Unit::TestCase
     @client1.remove(@jid2)
     @client2.remove(@jid1)
 
-    assert_before 60 do
+    assert_before 10 do
       assert_equal false, @client1.subscribed_to?(@jid2)
       assert_equal false, @client2.subscribed_to?(@jid1)
     end
@@ -103,7 +103,7 @@ class JabberSimpleTest < Test::Unit::TestCase
     @client1.new_subscriptions
     @client1.add(@jid2)
 
-    assert_before 60 do
+    assert_before 10 do
       assert @client1.subscribed_to?(@jid2)
       assert @client2.subscribed_to?(@jid1)
     end
@@ -225,33 +225,38 @@ class JabberSimpleTest < Test::Unit::TestCase
   end
 
   def test_set_pubsub_service
-    assert ! @client1.has_pubsub?
-    @client1.set_pubsub_service(@pubsub1)
+    if ! @client1.has_pubsub?
+      @client1.set_pubsub_service(@pubsub1)
+    end
     assert @client1.has_pubsub?
   end
 
-  def test_create_node
-    @client1.set_pubsub_service(@pubsub1) if ! @client1.has_pubsub?
-    @client2.set_pubsub_service(@pubsub2) if ! @client2.has_pubsub?
+  def test_create_delete_node
+    set_pubsub
+    delete_nodes
 
     assert_nothing_raised @client1.create_node("/home/#{@domain1}/testnode1")
     assert_nothing_raised @client2.create_node("/home/#{@domain2}/testnode2")
     assert_nothing_raised @client1.create_node("/home/#{@domain1}/testnode1/level1")
     assert_nothing_raised @client2.create_node("/home/#{@domain2}/testnode2/level2")
+
+    assert_nothing_raised @client1.delete_node("/home/#{@domain1}/testnode1")
+    assert_nothing_raised @client2.delete_node("/home/#{@domain2}/testnode2")
+    assert_nothing_raised @client1.delete_node("/home/#{@domain1}/testnode1/level1")
+    assert_nothing_raised @client2.delete_node("/home/#{@domain2}/testnode2/level2")
   end
 
   def test_publish_and_subscribe
-    begin
-      test_create_node
-    rescue
-      # do nothing
-    end
+    set_pubsub
+    create_nodes
 
     @client1.pubsubscribe_to("/home/#{@domain2}/testnode2/level2")
     @client2.pubsubscribe_to("/home/#{@domain1}/testnode1/level1")
 
     puts @client1.pubsubscriptions
     puts @client2.pubsubscriptions
+
+    delete_nodes
   end
 
   private
@@ -272,5 +277,29 @@ class JabberSimpleTest < Test::Unit::TestCase
       raise error
     end
   end
+
+  def create_nodes
+    @client1.create_node("/home/#{@domain1}/testnode1")
+    @client2.create_node("/home/#{@domain2}/testnode2")
+    @client1.create_node("/home/#{@domain1}/testnode1/level1")
+    @client2.create_node("/home/#{@domain2}/testnode2/level2")
+  end
+
+  def delete_nodes
+    begin
+      @client1.delete_node("/home/#{@domain1}/testnode1")
+      @client2.delete_node("/home/#{@domain2}/testnode2")
+      @client1.delete_node("/home/#{@domain1}/testnode1/level1")
+      @client2.delete_node("/home/#{@domain2}/testnode2/level2")
+    rescue
+      # => Do nothing
+    end
+  end
+
+  def set_pubsub
+    @client1.set_pubsub_service(@pubsub1) if ! @client1.has_pubsub?
+    @client2.set_pubsub_service(@pubsub2) if ! @client2.has_pubsub?
+  end
+
 
 end
