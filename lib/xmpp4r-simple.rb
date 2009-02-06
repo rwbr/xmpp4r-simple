@@ -399,7 +399,7 @@ module Jabber
       @pubsub = PubSub::ServiceHelper.new(@client, service)
 
       @pubsub.add_event_callback do |event|
-	  queue(:received_events) << event
+        queue(:received_events) << event
       end
     end
 
