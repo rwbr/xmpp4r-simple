@@ -103,12 +103,13 @@ module Jabber
       status(status, status_message)
       start_deferred_delivery_thread
 
-      @pubsub = nil
+      @pubsub = @pubsub_jid = nil
       begin
         domain = Jabber::JID.new(@jid).domain
-        set_pubsub_service("pubsub." + domain)
+        @pubsub_jid = "pubsub." + domain
+        set_pubsub_service(@pubsub_jid)
       rescue
-        @pubsub = nil
+        @pubsub = @pubsub_jid = nil
       end
     end
 
@@ -397,6 +398,7 @@ module Jabber
       raise NotConnected, "You are not connected" if @disconnected
       raise AlreadySet, "You already have a PubSub service. Currently it's not allowed to have more." if has_pubsub?
       @pubsub = PubSub::ServiceHelper.new(@client, service)
+      @pubsub_jid = service
 
       @pubsub.add_event_callback do |event|
         queue(:received_events) << event
@@ -407,6 +409,35 @@ module Jabber
     def pubsubscribe_to(node)
       raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
       @pubsub.subscribe_to(node)
+    end
+
+    # Unsubscribe from a node.
+    def pubunsubscribe_from(node)
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
+
+      # FIXME
+      # @pubsub.unsubscribe_from(node)
+      # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      # The above should just work, but I had to reimplement it since XMPP4R doesn't support subids
+      # and OpenFire (the Jabber Server I am testing against) seems to require it.
+
+      subids = find_subids_for(node)
+      return if subids.empty?
+
+      subids.each do |subid|
+        iq = Jabber::Iq.new(:set, @pubsub_jid)
+        iq.add(Jabber::PubSub::IqPubSub.new)
+        iq.from = @jid
+        unsub = REXML::Element.new('unsubscribe')
+        unsub.attributes['node'] = node
+        unsub.attributes['jid'] = @jid
+        unsub.attributes['subid'] = subid
+        iq.pubsub.add(unsub)
+        res = nil
+        @client.send_with_id(iq) do |reply|
+          res = reply.kind_of?(Jabber::Iq) and reply.type == :result
+        end # @stream.send_with_id(iq)
+      end
     end
 
     # Return the subscriptions we have in the configured PubSub service.
@@ -430,6 +461,15 @@ module Jabber
     def create_node(node)
       raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
       @pubsub.create_node(node)
+    end
+
+    # Return an array of noes I own
+    def my_nodes
+      ret = []
+      pubsubscriptions.each do |sub|
+        ret << sub.node if sub.attributes['affiliation'] == 'owner'
+      end
+      return ret
     end
 
     # Delete a PubSub node (Lots of options still have to be encoded!)
@@ -456,6 +496,16 @@ module Jabber
     end
 
     private
+
+    def find_subids_for(node)
+      ret = []
+      pubsubscriptions.each do |subscription|
+        if subscription.node == node
+          ret << subscription.subid
+        end
+      end
+      return ret
+    end
 
     def client=(client)
       self.roster = nil # ensure we clear the roster, since that's now associated with a different client.
