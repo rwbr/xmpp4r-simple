@@ -15,6 +15,7 @@
 # along with Jabber::Simple; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+require 'time'
 require 'rubygems'
 require 'xmpp4r'
 require 'xmpp4r/roster'
@@ -485,13 +486,33 @@ module Jabber
     end
 
     # Publish Simple Item. This is an item with one element and some text to it.
-    def publish_simple_item(node, element, text)
+    def publish_simple_item(node, text)
       raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
 
       item = Jabber::PubSub::Item.new
-      xml = REXML::Element.new(element)
+      xml = REXML::Element.new('value')
       xml.text = text
       item.add(xml)
+      publish_item(node, item)
+    end
+
+    # Publish atom Item. This is an item with one atom entry with title, body and time.
+    def publish_atom_item(node, title, body, time = Time.now)
+      raise NoPubSubService, "Have you forgot to call #set_pubsub_service ?" if ! has_pubsub?
+
+      item = Jabber::PubSub::Item.new
+      entry = REXML::Element.new('entry')
+      entry.add_namespace("http://www.w3.org/2005/Atom")
+      mytitle = REXML::Element.new('title')
+      mytitle.text = title
+      entry.add(mytitle)
+      mybody = REXML::Element.new('body')
+      mybody.text = body
+      entry.add(mybody)
+      published = REXML::Element.new("published")
+      published.text = time.utc.iso8601
+      entry.add(published)
+      item.add(entry)
       publish_item(node, item)
     end
 
