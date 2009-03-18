@@ -639,8 +639,8 @@ module Jabber
     def dequeue(queue, non_blocking = true, max_items = 100, &block)
       queue_items = []
       max_items.times do
-        queue_item = queue(queue).pop(non_blocking) rescue nil
-        break if queue_item.nil?
+        break if queue(queue).empty?
+        queue_item = queue(queue).pop(non_blocking)
         queue_items << queue_item
         yield queue_item if block_given?
       end
