@@ -97,9 +97,11 @@ module Jabber
     # passed in as the status_message argument.
     #
     # jabber = Jabber::Simple.new("me@example.com", "password", "Chat with me - Please!")
-    def initialize(jid, password, status = nil, status_message = "Available")
+    def initialize(jid, password, status = nil, status_message = "Available", host = nil, port=5222)
       @jid = jid
       @password = password
+      @host = host
+      @port = port
       @disconnected = false
       status(status, status_message)
       start_deferred_delivery_thread
@@ -254,6 +256,43 @@ module Jabber
       !queue(:received_messages).empty?
     end
 
+    # Returns an array of iq stanzas received since the last time
+    # iq_stanzas was called. There will be no stanzas in this queue
+    # unless you have enabled capture of <iq/> stanzas using the
+    # capture_iq_stanzas! method. Passing a block will yield each stanza in
+    # turn, allowing you to break part-way through processing (especially
+    # useful when your message handling code is not thread-safe (e.g.,
+    # ActiveRecord).
+    #
+    # e.g.:
+    #
+    #   jabber.capture_iq_stanzas!
+    #   jabber.iq_stanzas do |iq|
+    #     puts "Received iq stanza from #{iq.from}"
+    #   end
+    def iq_stanza(&block)
+      dequeue(:iq_stanzas, &block)
+    end
+
+    # Returns true if there are unprocessed iq stanzas waiting in the
+    # queue, false otherwise.
+    def iq_stanzas?
+      !queue(:iq_stanzas).empty?
+    end
+
+    # Tell the client to capture (or stop capturing) <iq/> stanzas
+    # addressed to it.  When the client is initially started, this
+    # is false.
+    def capture_iq_stanzas!(capture=true)
+      @iq_mutex.synchronize { @capture_iq_stanzas = capture }
+    end
+    
+    # Returns true if iq stanzas will be captured in the queue, as
+    # they arrive, false otherwise.
+    def capture_iq_stanzas?
+      @capture_iq_stanzas
+    end
+
     # Returns an array of presence updates received since the last time
     # presence_updates was called. Passing a block will yield each update in
     # turn, allowing you to break part-way through processing (especially
@@ -321,7 +360,7 @@ module Jabber
     def subscription_requests(&block)
       dequeue(:subscription_requests, &block)
     end
- 
+
     # Returns true if auto-accept subscriptions (friend requests) is enabled
     # (default), false otherwise.
     def accept_subscriptions?
@@ -551,7 +590,7 @@ module Jabber
       # Connect
       jid = JID.new(@jid)
       my_client = Client.new(@jid)
-      my_client.connect
+      my_client.connect(@host, @port)
       my_client.auth(@password)
       self.client = my_client
 
@@ -593,13 +632,19 @@ module Jabber
         end
       end
 
+      @iq_mutex = Mutex.new
+      capture_iq_stanzas!(false)
+      client.add_iq_callback do |iq|
+        queue(:iq_messages) << iq if capture_iq_stanzas?
+      end
+
       @presence_updates = {}
       @presence_mutex = Mutex.new
       roster.add_presence_callback do |roster_item, old_presence, new_presence|
         simple_jid = roster_item.jid.strip.to_s
         presence = case new_presence.type
-                   when nil: new_presence.show || :online
-                   when :unavailable: :unavailable
+                   when nil then new_presence.show || :online
+                   when :unavailable then :unavailable
                    else
                      nil
                    end
