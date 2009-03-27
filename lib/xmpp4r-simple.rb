@@ -121,6 +121,13 @@ module Jabber
     end
     
     # Send a message to jabber user jid.
+    # It is possible to send message to multiple users at once,
+    # just supply array of jids.
+    #
+    # Example usage:
+    #
+    #   jabber_simple.deliver("foo@example.com", "blabla")
+    #   jabber_simple.deliver(["foo@example.com", "bar@example.com"], "blabla")
     #
     # Valid message types are:
     # 
@@ -136,8 +143,8 @@ module Jabber
     #
     # message should be a string or a valid Jabber::Message object. In either case,
     # the message recipient will be set to jid.
-    def deliver(jid, message, type=:chat)
-      contacts(jid) do |friend|
+    def deliver(jids, message, type=:chat)
+      contacts(jids) do |friend|
         unless subscribed_to? friend
           add(friend.jid)
           return deliver_deferred(friend.jid, message, type)
@@ -214,6 +221,7 @@ module Jabber
     # in turn. This is mainly used internally, but exposed as an utility
     # function.
     def contacts(*contacts, &block)
+      contacts.flatten!
       @contacts ||= {}
       contakts = []
       contacts.each do |contact|
@@ -503,7 +511,7 @@ module Jabber
       @pubsub.create_node(node)
     end
 
-    # Return an array of noes I own
+    # Return an array of nodes I own
     def my_nodes
       ret = []
       pubsubscriptions.each do |sub|
