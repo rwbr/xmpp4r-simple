@@ -38,6 +38,18 @@ module Jabber
 
   class AlreadySet < StandardError #:nodoc:
   end
+  
+  module Roster  
+    class RosterItem
+      def chat_state
+        @chat_state
+      end
+      
+      def chat_state=(state)
+        @chat_state = state
+      end
+    end
+  end
 
   class Contact #:nodoc:
 
@@ -213,26 +225,9 @@ module Jabber
       end
     end
 
-    # If contacts is a single contact, returns a Jabber::Contact object
-    # representing that user; if contacts is an array, returns an array of
-    # Jabber::Contact objects.
-    #
-    # When called with a block, contacts will yield each Jabber::Contact object
-    # in turn. This is mainly used internally, but exposed as an utility
-    # function.
-    def contacts(*contacts, &block)
-      contacts.flatten!
-      @contacts ||= {}
-      contakts = []
-      contacts.each do |contact|
-        jid = contact.to_s
-        unless @contacts[jid]
-          @contacts[jid] = contact.respond_to?(:ask_for_authorization!) ? contact : Contact.new(self, contact)
-        end
-        yield @contacts[jid] if block_given?
-        contakts << @contacts[jid]
-      end
-      contakts.size > 1 ? contakts : contakts.first
+    # Returns array of roster items.
+    def contact_list
+      roster.items.values
     end
 
     # Returns true if the Jabber client is connected to the Jabber server,
@@ -564,6 +559,27 @@ module Jabber
     end
 
     private
+    
+    # If contacts is a single contact, returns a Jabber::Contact object
+    # representing that user; if contacts is an array, returns an array of
+    # Jabber::Contact objects.
+    #
+    # When called with a block, contacts will yield each Jabber::Contact object
+    # in turn. This is used internally.
+    def contacts(*contacts, &block)
+      contacts.flatten!
+      @contacts ||= {}
+      contakts = []
+      contacts.each do |contact|
+        jid = contact.to_s
+        unless @contacts[jid]
+          @contacts[jid] = contact.respond_to?(:ask_for_authorization!) ? contact : Contact.new(self, contact)
+        end
+        yield @contacts[jid] if block_given?
+        contakts << @contacts[jid]
+      end
+      contakts.size > 1 ? contakts : contakts.first
+    end
 
     def find_subids_for(node)
       ret = []
@@ -624,6 +640,10 @@ module Jabber
     def register_default_callbacks
       client.add_message_callback do |message|
         queue(:received_messages) << message unless message.body.nil?
+        from = roster.find(message.from).values.first
+        if !message.chat_state.nil? && from.chat_state != message.chat_state
+          from.chat_state = message.chat_state
+        end
       end
 
       roster.add_subscription_callback do |roster_item, presence|
