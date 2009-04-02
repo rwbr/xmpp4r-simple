@@ -158,8 +158,7 @@ module Jabber
     def deliver(jids, message, type=:chat)
       contacts(jids) do |friend|
         unless subscribed_to? friend
-          add(friend.jid)
-          return deliver_deferred(friend.jid, message, type)
+          return
         end
         if message.kind_of?(Jabber::Message)
           msg = message
@@ -719,7 +718,6 @@ module Jabber
       end
       queue_items
     end
-
   end
 end
 
