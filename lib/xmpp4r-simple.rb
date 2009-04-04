@@ -108,8 +108,8 @@ module Jabber
     # to the Jabber server and your status message will be set to the string
     # passed in as the status_message argument.
     #
-    # jabber = Jabber::Simple.new("me@example.com", "password", "Chat with me - Please!")
-    def initialize(jid, password, status = nil, status_message = "Available", host = nil, port=5222)
+    # jabber = Jabber::Simple.new("me@example.com", "password", nil, "Chat with me - Please!")
+    def initialize(jid, password, status = nil, status_message = "Available", host = nil, port = 5222)
       @jid = jid
       @password = password
       @host = host
@@ -117,7 +117,7 @@ module Jabber
       @disconnected = false
       status(status, status_message)
       start_deferred_delivery_thread
-
+      
       @pubsub = @pubsub_jid = nil
       begin
         domain = Jabber::JID.new(@jid).domain
@@ -155,7 +155,7 @@ module Jabber
     #
     # message should be a string or a valid Jabber::Message object. In either case,
     # the message recipient will be set to jid.
-    def deliver(jids, message, type=:chat)
+    def deliver(jids, message, type = :chat)
       contacts(jids) do |friend|
         unless subscribed_to? friend
           add(friend.jid)
@@ -188,6 +188,16 @@ module Jabber
       @presence = presence
       @status_message = message
       stat_msg = Presence.new(@presence, @status_message)
+
+      if !avatar_hash.nil?
+        x = Jabber::X.new
+        x.add_namespace('vcard-temp:x:update')
+        photo = REXML::Element::new("photo")
+        photo.add(REXML::Text.new(avatar_hash))
+        x.add(photo)
+        stat_msg.add_element(x)
+      end
+      
       send!(stat_msg)
     end
 
@@ -228,6 +238,46 @@ module Jabber
     # Returns array of roster items.
     def contact_list
       roster.items.values
+    end
+    
+    # Retrieve vCard of an entity
+    #
+    # Raises exception upon retrieval error, please catch that!
+    #
+    # Usage of Threads is suggested here as vCards can be very
+    # big.
+    #
+    # jid:: [Jabber::JID] or nil (should be stripped, nil for the client's own vCard)
+    # result:: [Jabber::IqVcard] or nil (nil results may be handled as empty vCards)
+    def get_info(jid = nil)
+      Jabber::Vcard::Helper.new(client).get(jid)
+    end
+    
+    # Update your own vCard
+    #
+    # Raises exception when setting fails
+    #
+    # Usage of Threads suggested here, too. The function
+    # waits for approval from the server.
+    # e.g.:
+    #
+    #   info =  Jabber::Vcard::IqVcard.new
+    #   info["NICKNAME"] = "amay"
+    #   jabber.update_info(info)
+    def update_info(vcard)
+      Jabber::Vcard::Helper.new(client).set(vcard)
+    end
+    
+    # Returns SHA1 hash of the avatar image data.
+    #
+    # This hash is then included in the user's presence information.
+    def avatar_hash
+      vcard = get_info
+      if !vcard.nil? && !vcard["PHOTO/BINVAL"].nil?
+        Digest::SHA1.hexdigest(Base64.decode64(vcard["PHOTO/BINVAL"]))
+      else
+        nil
+      end
     end
 
     # Returns true if the Jabber client is connected to the Jabber server,
