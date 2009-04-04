@@ -155,7 +155,7 @@ module Jabber
     #
     # message should be a string or a valid Jabber::Message object. In either case,
     # the message recipient will be set to jid.
-    def deliver(jids, message, type = :chat)
+    def deliver(jids, message, type = :chat, chat_state = :active)
       contacts(jids) do |friend|
         unless subscribed_to? friend
           add(friend.jid)
@@ -169,6 +169,7 @@ module Jabber
           msg.type = type
           msg.body = message
         end
+        msg.chat_state = chat_state
         send!(msg)
       end
     end
