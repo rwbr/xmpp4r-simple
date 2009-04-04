@@ -167,9 +167,9 @@ module Jabber
         else
           msg = Message.new(friend.jid)
           msg.type = type
+          msg.chat_state = chat_state
           msg.body = message
         end
-        msg.chat_state = chat_state
         send!(msg)
       end
     end
