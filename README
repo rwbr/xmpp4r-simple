@@ -8,11 +8,25 @@ Jabber::Simple - An extremely easy-to-use Jabber client library.
   im = Jabber::Simple.new("user@example.com", "password")
   im.deliver("friend@example.com", "Hey there friend!")
 
+  # Send a message to few friends at once:
+  im.deliver(["friend1@example.com", "friend2@example.com"], "Hey there friends!")
+
   # Get received messages and print them out to the console:
   im.received_messages { |msg| puts msg.body if msg.type == :chat }
 
   # Send an authorization request to a user:
   im.add("friend@example.com")
+
+  # View contact list (returns array of roster items)
+  im.contact_list
+
+  # Get friend's vcard (pass nil for your own)
+  info = im.get_info("friend@example.com")
+
+  # Update your own info
+  info = im.get_info
+  info["NICKNAME"] = "amay"
+  im.update_info(info)
 
   # Get presence updates from your friends, and print them out to the console:
   # (admittedly, this one needs some work)
