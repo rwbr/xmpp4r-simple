@@ -159,7 +159,8 @@ module Jabber
       contacts(jids) do |friend|
         unless subscribed_to? friend
           add(friend.jid)
-          return deliver_deferred(friend.jid, message, type)
+          deliver_deferred(friend.jid, message, type)
+          next
         end
         if message.kind_of?(Jabber::Message)
           msg = message
