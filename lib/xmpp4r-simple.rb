@@ -109,7 +109,7 @@ module Jabber
     # passed in as the status_message argument.
     #
     # jabber = Jabber::Simple.new("me@example.com", "password", nil, "Chat with me - Please!")
-    def initialize(jid, password, status = nil, status_message = "Available", host = nil, port = 5222)
+    def initialize(jid, password, status = nil, status_message = "Available", host = nil, port=5222)
       @jid = jid
       @password = password
       @host = host
