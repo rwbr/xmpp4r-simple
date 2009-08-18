@@ -17,7 +17,10 @@
 
 require 'rake/testtask'
 require 'rake/rdoctask'
-require 'rcov/rcovtask'
+begin
+  require 'rcov/rcovtask'
+rescue LoadError
+end
 
 desc "Package Gem"
 task :package do
@@ -41,7 +44,9 @@ Rake::RDocTask.new do |rdoc|
   rdoc.title = "Jabber::Simple"
 end
 
-Rcov::RcovTask.new do |t|
-  t.test_files = FileList['test/**/test*.rb'] 
-  t.rcov_opts << "--sort coverage"
+if defined?(Rcov)
+  Rcov::RcovTask.new do |t|
+    t.test_files = FileList['test/**/test*.rb'] 
+    t.rcov_opts << "--sort coverage"
+  end
 end

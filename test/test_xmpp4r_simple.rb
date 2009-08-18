@@ -35,6 +35,10 @@ class JabberSimpleTest < Test::Unit::TestCase
       @jid2_raw = @@connections[:jid2_raw]
       @jid1 = @jid1_raw.strip.to_s
       @jid2 = @jid2_raw.strip.to_s
+      @domain1 = @jid1_raw.domain
+      @domain2 = @jid2_raw.domain
+      @pubsub1 = "pubsub." + @domain1
+      @pubsub2 = "pubsub." + @domain2
       return true
     end
 
@@ -91,7 +95,7 @@ class JabberSimpleTest < Test::Unit::TestCase
     @client1.remove(@jid2)
     @client2.remove(@jid1)
 
-    assert_before 60 do
+    assert_before 10 do
       assert_equal false, @client1.subscribed_to?(@jid2)
       assert_equal false, @client2.subscribed_to?(@jid1)
     end
@@ -99,7 +103,7 @@ class JabberSimpleTest < Test::Unit::TestCase
     @client1.new_subscriptions
     @client1.add(@jid2)
 
-    assert_before 60 do
+    assert_before 10 do
       assert @client1.subscribed_to?(@jid2)
       assert @client2.subscribed_to?(@jid1)
     end
@@ -220,15 +224,58 @@ class JabberSimpleTest < Test::Unit::TestCase
     @client1.reconnect
   end
 
+  def test_set_pubsub_service
+    if ! @client1.has_pubsub?
+      @client1.set_pubsub_service(@pubsub1)
+    end
+    assert @client1.has_pubsub?
+  end
+
+  def test_create_delete_node
+    set_pubsub
+    delete_nodes
+
+    assert_nothing_raised @client1.create_node("/home/#{@domain1}/testnode1")
+    assert_nothing_raised @client2.create_node("/home/#{@domain2}/testnode2")
+    assert_nothing_raised @client1.create_node("/home/#{@domain1}/testnode1/level1")
+    assert_nothing_raised @client2.create_node("/home/#{@domain2}/testnode2/level2")
+
+    assert_nothing_raised @client1.delete_node("/home/#{@domain1}/testnode1")
+    assert_nothing_raised @client2.delete_node("/home/#{@domain2}/testnode2")
+    assert_nothing_raised @client1.delete_node("/home/#{@domain1}/testnode1/level1")
+    assert_nothing_raised @client2.delete_node("/home/#{@domain2}/testnode2/level2")
+  end
+
+  def test_publish_and_subscribe
+    set_pubsub
+    create_nodes
+
+    @client1.pubsubscribe_to("/home/#{@domain2}/testnode2/level2")
+    @client2.pubsubscribe_to("/home/#{@domain1}/testnode1/level1")
+
+    puts @client1.pubsubscriptions
+    puts @client2.pubsubscriptions
+
+    delete_nodes
+  end
+
   private
 
   def assert_before(seconds, &block)
     error = nil
+
+    # This is for Ruby 1.9.1 compatibility
+    assertion_exception_class = begin
+      MiniTest::Assertion
+    rescue NameError
+      Test::Unit::AssertionFailedError
+    end
+
     begin
       Timeout::timeout(seconds) {
         begin
           yield
-        rescue => e
+        rescue assertion_exception_class => e
           error = e
           sleep 0.5
           retry
@@ -238,5 +285,29 @@ class JabberSimpleTest < Test::Unit::TestCase
       raise error
     end
   end
+
+  def create_nodes
+    @client1.create_node("/home/#{@domain1}/testnode1")
+    @client2.create_node("/home/#{@domain2}/testnode2")
+    @client1.create_node("/home/#{@domain1}/testnode1/level1")
+    @client2.create_node("/home/#{@domain2}/testnode2/level2")
+  end
+
+  def delete_nodes
+    begin
+      @client1.delete_node("/home/#{@domain1}/testnode1")
+      @client2.delete_node("/home/#{@domain2}/testnode2")
+      @client1.delete_node("/home/#{@domain1}/testnode1/level1")
+      @client2.delete_node("/home/#{@domain2}/testnode2/level2")
+    rescue
+      # => Do nothing
+    end
+  end
+
+  def set_pubsub
+    @client1.set_pubsub_service(@pubsub1) if ! @client1.has_pubsub?
+    @client2.set_pubsub_service(@pubsub2) if ! @client2.has_pubsub?
+  end
+
 
 end
